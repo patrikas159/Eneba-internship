@@ -1,0 +1,34 @@
+security:
+    password_hashers:
+        # bcrypt (PHP password_hash). Cost 12 in prod/dev, minimum in tests for speed.
+        App\Entity\User:
+            algorithm: bcrypt
+            cost: 12
+
+    providers:
+        app_users:
+            entity: { class: App\Entity\User, property: email }
+
+    firewalls:
+        dev:
+            pattern: ^/(_profiler(/|$)|(_wdt|assets|build)/)
+            security: false
+        main:
+            # No server-side session: identity comes from the JWT in the httpOnly auth cookie.
+            stateless: true
+            provider: app_users
+            custom_authenticators:
+                - App\Auth\JwtCookieAuthenticator
+            entry_point: App\Auth\JwtCookieAuthenticator
+
+    # Only the first matching rule applies. Everything else (catalog, search, home) is public.
+    access_control:
+        - { path: ^/api/auth/me$, roles: ROLE_USER }
+        - { path: ^/api/orders, roles: ROLE_USER }
+
+when@test:
+    security:
+        password_hashers:
+            App\Entity\User:
+                algorithm: bcrypt
+                cost: 4

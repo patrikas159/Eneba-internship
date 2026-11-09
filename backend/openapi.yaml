@@ -90,8 +90,116 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/ProductCard' } }
+  /auth/register:
+    post:
+      summary: Create an account and sign in (sets the httpOnly auth cookie)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, maxLength: 180 }
+                password: { type: string, minLength: 8, maxLength: 128 }
+                displayName: { type: string, maxLength: 80, description: 'Defaults to the part of the email before @' }
+      responses:
+        '201':
+          description: 'Account created; sets cookie eneba_auth=<jwt> (HttpOnly, SameSite=Lax)'
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserEnvelope' }
+        '409':
+          description: Email already registered (error = email_taken)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+        '422':
+          description: Invalid fields (error = validation_failed)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+  /auth/login:
+    post:
+      summary: Sign in with email + password (sets the httpOnly auth cookie)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Signed in
+          headers:
+            Set-Cookie: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserEnvelope' }
+        '401':
+          description: Wrong email or password (error = invalid_credentials; same response for unknown emails)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /auth/logout:
+    post:
+      summary: Sign out (expires the auth cookie)
+      responses:
+        '204':
+          description: Signed out
+  /auth/me:
+    get:
+      summary: The signed-in user
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserEnvelope' }
+        '401':
+          description: Not signed in or session expired (error = unauthorized)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: eneba_auth
+      description: HS256 JWT (7-day expiry) set by /auth/register and /auth/login. HttpOnly, SameSite=Lax, Secure in production.
   schemas:
+    User:
+      type: object
+      required: [id, email, displayName, createdAt]
+      properties:
+        id: { type: integer }
+        email: { type: string, format: email }
+        displayName: { type: string }
+        createdAt: { type: string, format: date-time }
+    UserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+    ValidationError:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string, example: validation_failed }
+        message: { type: string }
+        fields:
+          type: object
+          additionalProperties: { type: string }
+          description: Field name -> human-readable problem
     Error:
       type: object
       required: [error, message]
