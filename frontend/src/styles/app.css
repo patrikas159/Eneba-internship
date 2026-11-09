@@ -190,3 +190,35 @@ select.input { cursor: pointer; }
   .store { grid-template-columns: 1fr; }
   .store__filters { position: static; }
 }
+
+/* Product page */
+.product { display: grid; grid-template-columns: 300px 1fr; gap: 40px; align-items: start; }
+.product__cover { border-radius: var(--radius-lg); overflow: hidden; background: var(--bg-elevated); aspect-ratio: 3 / 4; }
+.product__cover img { width: 100%; height: 100%; object-fit: cover; }
+.product__info h1 { font-size: 34px; margin-bottom: 12px; }
+.product__tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.product__description { max-width: 720px; line-height: 1.6; }
+.tag { padding: 3px 10px; border-radius: 999px; background: var(--bg-card); font-size: 13px; font-weight: 600; }
+.tag--link:hover { background: var(--border); }
+.offers { margin-top: 28px; }
+.offers__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.offer {
+  display: grid; grid-template-columns: 1fr 110px 140px 170px; align-items: center; gap: 16px;
+  padding: 14px 18px; background: var(--bg-elevated); border: 1px solid transparent; border-radius: var(--radius);
+}
+.offer--best { border-color: var(--accent); }
+.offer--out { opacity: .6; }
+.offer__seller { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.offer__badge { background: var(--accent); color: var(--accent-text); font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+.offer__stock { font-size: 14px; }
+.offer__price { display: flex; flex-direction: column; align-items: flex-end; }
+.offer__price s { font-size: 13px; }
+.offer__price strong { font-size: 20px; }
+.offer__action { display: flex; flex-direction: column; align-items: stretch; gap: 4px; text-align: center; }
+.offer__incart { font-size: 13px; color: var(--green); font-weight: 600; }
+@media (max-width: 760px) {
+  .product { grid-template-columns: 1fr; }
+  .product__cover { max-width: 260px; }
+  .offer { grid-template-columns: 1fr auto; }
+  .offer__price { align-items: flex-start; }
+}
