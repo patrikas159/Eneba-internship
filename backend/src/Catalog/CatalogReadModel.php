@@ -20,10 +20,12 @@ final class CatalogReadModel
     public const SEARCH_THRESHOLD = 0.3;
 
     /** Per-product aggregate over active offers: cheapest in-stock offer, seller count, total stock. */
+    // Stock = sellable keys: available, or reserved by an order whose reservation expired
+    // (same rule as OrderService's key-locking query). Keep the three copies below in sync.
     private const PRICE_CTE = <<<'SQL'
         offer_stock AS (
             SELECT o.id, o.product_id, o.price_cents, o.original_price_cents, o.currency,
-                   (SELECT count(*) FROM product_keys k WHERE k.offer_id = o.id AND k.status = 'available') AS stock
+                   (SELECT count(*) FROM product_keys k WHERE k.offer_id = o.id AND (k.status = 'available' OR (k.status = 'reserved' AND k.reserved_until < LOCALTIMESTAMP))) AS stock
             FROM offers o
             WHERE o.active
         ),
@@ -197,11 +199,11 @@ final class CatalogReadModel
         $offers = $this->connection->fetchAllAssociative(
             "SELECT o.id, o.price_cents, o.original_price_cents, o.currency,
                     s.id AS seller_id, s.name AS seller_name, s.slug AS seller_slug, s.rating AS seller_rating,
-                    (SELECT count(*) FROM product_keys k WHERE k.offer_id = o.id AND k.status = 'available') AS stock
+                    (SELECT count(*) FROM product_keys k WHERE k.offer_id = o.id AND (k.status = 'available' OR (k.status = 'reserved' AND k.reserved_until < LOCALTIMESTAMP))) AS stock
             FROM offers o
             JOIN sellers s ON s.id = o.seller_id
             WHERE o.product_id = :id AND o.active
-            ORDER BY (SELECT count(*) FROM product_keys k WHERE k.offer_id = o.id AND k.status = 'available') = 0, o.price_cents, o.id",
+            ORDER BY (SELECT count(*) FROM product_keys k WHERE k.offer_id = o.id AND (k.status = 'available' OR (k.status = 'reserved' AND k.reserved_until < LOCALTIMESTAMP))) = 0, o.price_cents, o.id",
             ['id' => $row['id']],
         );
 

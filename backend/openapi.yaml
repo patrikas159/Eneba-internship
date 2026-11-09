@@ -169,7 +169,161 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /orders:
+    post:
+      summary: Place an order and reserve keys for 15 minutes
+      description: |
+        Reserves one license key per unit (`FOR UPDATE SKIP LOCKED`, so concurrent buyers never get the same key).
+        Lines for the same offer are merged. Pending orders older than 15 minutes are cancelled and their keys released.
+      security: [{ cookieAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrderRequest' }
+      responses:
+        '201':
+          description: Order created with status `pending`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderEnvelope' }
+        '401':
+          description: Not signed in (error = unauthorized)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            `offer_unavailable` (unknown or inactive offer; extra field `offerId`) or
+            `out_of_stock` (not enough free keys; extra fields `offerId`, `available`)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutError' }
+        '422':
+          description: Invalid body (error = validation_failed) or `mixed_currency`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationError' }
+    get:
+      summary: Order history of the signed-in user (newest first)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Orders; key codes are included only for paid orders
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/Order' } }
+        '401':
+          description: Not signed in (error = unauthorized)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /orders/{reference}:
+    parameters:
+      - $ref: '#/components/parameters/OrderReference'
+    get:
+      summary: One order of the signed-in user
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Order (with key codes when paid)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderEnvelope' }
+        '401':
+          description: Not signed in (error = unauthorized)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '404':
+          description: Unknown order or an order of another user (error = not_found)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /orders/{reference}/pay:
+    parameters:
+      - $ref: '#/components/parameters/OrderReference'
+    post:
+      summary: Pay a pending order with the simulated payment provider
+      description: |
+        Idempotent: repeating a request with the same `Idempotency-Key` returns the stored result
+        (same status code and body) with header `Idempotent-Replayed: true`, and never charges twice.
+        Card number `4000 0000 0000 0002` is declined (402); any other value, or no body, succeeds.
+        After a decline the order stays `pending` and can be retried with a new key.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: 'Client-generated key, unique per payment attempt (8-64 chars, [A-Za-z0-9_-])'
+          schema: { type: string, pattern: '^[A-Za-z0-9_-]{8,64}$' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cardNumber: { type: string, example: '4242 4242 4242 4242' }
+      responses:
+        '200':
+          description: Paid; items include the delivered key codes
+          headers:
+            Idempotent-Replayed: { schema: { type: string, enum: ['true'] }, description: Present when this is a replay }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderEnvelope' }
+        '400':
+          description: Missing or malformed Idempotency-Key (error = invalid_idempotency_key)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '401':
+          description: Not signed in (error = unauthorized)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '402':
+          description: Card declined (error = payment_declined); the order is still pending
+          headers:
+            Idempotent-Replayed: { schema: { type: string, enum: ['true'] }, description: Present when this is a replay }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [error, message, order]
+                properties:
+                  error: { type: string, example: payment_declined }
+                  message: { type: string }
+                  order: { $ref: '#/components/schemas/Order' }
+        '404':
+          description: Unknown order or an order of another user (error = not_found)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: |
+            `order_already_paid` (a new key on a paid order), `order_not_payable` (cancelled or failed; extra field `status`)
+            or `reservation_expired` (the 15-minute reservation ran out)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CheckoutError' }
+        '422':
+          description: The Idempotency-Key was already used for a different order (error = idempotency_key_reused)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 components:
+  parameters:
+    OrderReference:
+      name: reference
+      in: path
+      required: true
+      schema: { type: string, pattern: '^[A-Z0-9-]{1,20}$', example: ENB-7K2M9Q4XHP }
   securitySchemes:
     cookieAuth:
       type: apiKey
@@ -278,3 +432,57 @@ components:
             minCents: { type: integer }
             maxCents: { type: integer }
         sorts: { type: array, items: { type: string } }
+    CheckoutError:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string, example: out_of_stock }
+        message: { type: string }
+        offerId: { type: integer, description: 'offer_unavailable, out_of_stock' }
+        available: { type: integer, description: 'out_of_stock: keys still free for that offer' }
+        status: { type: string, description: 'order_not_payable: current order status' }
+    CreateOrderRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [offerId, quantity]
+            properties:
+              offerId: { type: integer, minimum: 1 }
+              quantity: { type: integer, minimum: 1, maximum: 10, description: 'Max 10 per offer after merging duplicate lines' }
+    OrderItem:
+      type: object
+      required: [offerId, productSlug, productName, coverUrl, platform, region, sellerName, unitPriceCents, quantity, keys]
+      properties:
+        offerId: { type: integer }
+        productSlug: { type: string }
+        productName: { type: string }
+        coverUrl: { type: [string, 'null'] }
+        platform: { type: string }
+        region: { type: string }
+        sellerName: { type: string }
+        unitPriceCents: { type: integer, description: Price at the time of ordering }
+        quantity: { type: integer }
+        keys: { type: array, items: { type: string }, description: 'License key codes; empty unless the order is paid' }
+    Order:
+      type: object
+      required: [reference, status, totalCents, currency, createdAt, paidAt, expiresAt, items]
+      properties:
+        reference: { type: string, example: ENB-7K2M9Q4XHP }
+        status: { type: string, enum: [pending, paid, cancelled, failed] }
+        totalCents: { type: integer }
+        currency: { type: string, example: EUR }
+        createdAt: { type: string, format: date-time }
+        paidAt: { type: [string, 'null'], format: date-time }
+        expiresAt: { type: [string, 'null'], format: date-time, description: 'When the key reservation ends; null unless pending' }
+        items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+    OrderEnvelope:
+      type: object
+      required: [order]
+      properties:
+        order: { $ref: '#/components/schemas/Order' }
