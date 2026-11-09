@@ -1,0 +1,172 @@
+# Eneba-style digital key marketplace
+
+Internship assignment: a marketplace for digital game keys that looks and works like eneba.com.
+Visitors browse a store, search with typo tolerance, compare offers from several sellers,
+buy with a simulated payment and get a digital key straight away.
+
+| Part | Where |
+|---|---|
+| Store (filters, sort, name search) | `/store` · `GET /api/products`, `GET /api/products/filters` |
+| Homepage (blocks served by the backend) | `/` · `GET /api/home` |
+| Search from the header (autocomplete, typos) | `GET /api/search/suggest`, `GET /api/products?q=` |
+| Product page with offers from several sellers | `/product/:slug` · `GET /api/products/{slug}` |
+| Cart, checkout, simulated payment, digital key | `/cart`, `/checkout/:reference` · `POST /api/orders`, `POST /api/orders/{ref}/pay` |
+| Sign up / sign in, order history (signed-in only) | `/login`, `/register`, `/orders` · `/api/auth/*`, `GET /api/orders` |
+
+The full API contract is in [`backend/openapi.yaml`](backend/openapi.yaml). Frontend types are generated from it.
+
+## Stack
+
+- **Frontend:** React 19 + TypeScript, Vite, React Router, TanStack Query. Plain CSS with design tokens
+  in `frontend/src/styles/tokens.css` (Eneba colours, type scale, spacing).
+- **Backend:** PHP 8.5, Symfony 7.4, Doctrine ORM 3.7, REST/JSON, served by FrankenPHP.
+- **Database:** PostgreSQL 16 with the `pg_trgm` extension.
+- **Tests:** PHPUnit integration tests against a real Postgres database, each test rolled back
+  by DAMA DoctrineTestBundle.
+- **Product data:** 30 real games. Names, covers and artwork were fetched from the IGDB API
+  once and saved in `backend/data/seed/products.json`, so the app never calls IGDB at runtime.
+
+## Quick start
+
+You need Docker and Node 20.19+ or 22.12+. Nothing else (PHP and Composer run in the container).
+
+```bash
+# 1. Backend secrets (untracked file). JWT_SECRET must be at least 32 characters.
+echo "JWT_SECRET=$(openssl rand -hex 32)" > backend/.env.local
+
+# 2. Start Postgres (host port 5433) and the API (host port 8080)
+docker compose up -d --build
+docker compose exec -T api composer install
+docker compose exec -T api php bin/console doctrine:migrations:migrate -n
+docker compose exec -T api php bin/console app:seed        # add --purge to reset the data
+
+# 3. Frontend dev server on http://localhost:5173 (proxies /api to :8080)
+cd frontend
+npm install
+npm run dev
+```
+
+Check the API: `curl http://localhost:8080/api/health`.
+
+Simulated payment: any card number works, except `4000 0000 0000 0002`, which is always declined
+so you can try the failure and retry path.
+
+Other commands:
+
+| Command | What it does |
+|---|---|
+| `php bin/console app:orders:expire` | Cancels pending orders whose 15-minute key reservation ran out and frees their keys |
+| `php bin/console app:igdb:enrich [--dry-run] [--force]` | Refreshes covers in the seed JSON from IGDB. Needs `IGDB_CLIENT_ID` and `IGDB_CLIENT_SECRET` in `.env.local`. Only used while building the seed data. |
+| `npm run gen:api` (frontend) | Regenerates `src/api/schema.d.ts` from `openapi.yaml` |
+| `npm run build` / `npm run lint` (frontend) | Type check + production build / oxlint |
+
+## Tests
+
+The tests use a separate database, `eneba_test`. Create it once:
+
+```bash
+docker compose exec -T api php bin/console --env=test doctrine:database:create
+docker compose exec -T api php bin/console --env=test doctrine:migrations:migrate -n
+```
+
+Then run:
+
+```bash
+docker compose exec -T api php bin/phpunit
+```
+
+`backend/tests/Checkout/OrderServiceTest.php` covers the checkout rules: reserving keys and
+computing totals, out-of-stock and unavailable offers, successful payment, idempotent replays,
+reusing an idempotency key for a different request, declined card and retry, another user's
+order, expired orders and expired key reservations.
+
+## Architecture
+
+```
+React SPA ──/api──▶ Symfony controllers ──▶ read models (DBAL SQL)     ──▶ PostgreSQL
+                                        └─▶ OrderService (ORM + locks) ──▶ PaymentProvider (simulated)
+```
+
+Reads (catalog, search, homepage, order history) go through read models that run hand-written SQL
+and return plain arrays. Writes (sign-up, orders, payment) go through Doctrine entities. Money is
+stored as integer cents everywhere.
+
+### Homepage: a layout API with one provider per block type
+
+The `home_blocks` table holds the page layout: block type, title, position, active flag and
+JSON config. `GET /api/home` (`backend/src/Home/HomeLayout.php`) reads the active blocks in order
+and passes each one to the provider registered for its type:
+
+| Block type | Provider | Source |
+|---|---|---|
+| `banners` | `BannersProvider` | `banners` table |
+| `best_sellers` | `BestSellersProvider` | in-stock products ranked by keys sold |
+| `deals` | `DealsProvider` | biggest discounts in the catalog |
+| `new_releases` | `NewReleasesProvider` | newest release dates |
+| `genre` | `GenreProvider` | products in the genre (and optional platform) set in the block settings |
+
+Providers implement `HomeBlockProvider` and are found through a DI tag, so a new block type is one
+new class plus a row in the table. The frontend only maps an item kind (`banner`, `product`,
+`discount`) to a component. It has no hardcoded titles, products or order. A block with an unknown
+type or no items is skipped and logged instead of breaking the page.
+
+### Search: typo-tolerant with pg_trgm
+
+Product names have a trigram GIN index (`idx_products_name_trgm`). A product matches when its name
+contains the query (`ILIKE '%q%'`) or is close enough by word similarity (`q <% name`, threshold 0.3).
+Both checks can use the index. Results are ranked by word similarity, then full similarity, so
+both "witcher wld hunt" and "cyberpnk" find *The Witcher 3: Wild Hunt* and *Cyberpunk 2077*. The header search box calls
+`/api/search/suggest` while you type (debounced) and shows covers and lowest prices. Enter opens the
+full store results for the query.
+
+### Checkout: correctness under concurrency
+
+`backend/src/Checkout/OrderService.php` follows these rules:
+
+- **Stock is real keys.** An offer's stock is the number of its keys that are `available`, or
+  `reserved` with an expired reservation. There is no separate counter that could drift.
+- **Placing an order reserves specific keys** with `SELECT ... FOR UPDATE SKIP LOCKED`. Two buyers can
+  never get the same key, and they never wait on each other. A reservation lasts 15 minutes.
+- **Payment is idempotent.** The client sends an `Idempotency-Key` header. Sending the same key again
+  returns the stored result. Reusing a key for a different request returns 422. The order row is locked
+  (`FOR UPDATE`) while paying, so two parallel payments for one order cannot both charge.
+- **Prices always come from the `offers` table**, never from the client.
+- A declined payment keeps the order pending so the buyer can try again. Keys are only revealed once
+  the order is paid.
+
+Payment goes through a `PaymentProvider` interface. The only implementation, `SimulatedPaymentProvider`,
+needs no external account. A Stripe test-mode provider could replace it without touching `OrderService`.
+
+### Authentication
+
+Registration stores a bcrypt hash. Sign-in sets a signed JWT (HS256) in an **httpOnly, SameSite=Lax**
+cookie, which is `Secure` in production. JavaScript never sees the token, so an XSS bug cannot steal it,
+and SameSite stops cross-site POSTs. The SPA and API share one origin, so CORS is not needed.
+`/api/orders*` requires a signed-in user. The frontend redirects to sign-in and returns you to checkout
+afterwards.
+
+## Decisions and trade-offs
+
+- **Depth over breadth.** I spent most of the time on the three parts I thought mattered most: the
+  homepage layout API, search and checkout correctness. I left out wishlists, reviews, real payments,
+  seller dashboards and admin screens.
+- **PHP/Symfony**: the assignment allows PHP or Go, and Symfony + Doctrine is a mature fit for a REST API. DBAL SQL for reads keeps the trigram and aggregate
+  queries clear. The ORM handles writes, where entities and invariants matter.
+- **Postgres trigram search instead of Elasticsearch/Meilisearch.** With a catalog this size it is fast,
+  needs no extra service and handles typos well enough. For a much larger catalog or more languages
+  I would use a dedicated search engine.
+- **Simulated payment** behind an interface. The spec allows it, and it keeps the deployed demo free of
+  third-party accounts.
+- **Seed data saved once from IGDB** so the demo is reproducible and does not depend on IGDB rate
+  limits or credentials at runtime.
+- **One origin for SPA and API** so the cookie auth stays simple and safe (no CORS, no tokens in
+  `localStorage`).
+
+## AI usage
+
+I built this with Claude Code as the main agent. I made the product and architecture decisions
+(stack, scope, data source, what to test) and reviewed every change. Some routine implementation was
+sent to a local coding model ("Splash"). Every prompt sent to it is recorded with its outcome.
+
+- Full agent chat history (prompts and responses): `docs/ai-chat-logs/`
+- Prompts sent to the local worker: [`docs/ai-chat-logs/splash-prompts.md`](docs/ai-chat-logs/splash-prompts.md)
