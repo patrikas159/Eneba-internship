@@ -120,6 +120,7 @@ final class SeedCommand extends Command
         }
 
         $slugs = [];
+        $artwork = [];
         foreach ($rows as $row) {
             $product = new Product($row['slug'], $row['name'], $row['description'], $row['platform'], $row['region']);
             $product->setGenres($row['genres'] ?? []);
@@ -130,6 +131,7 @@ final class SeedCommand extends Command
             }
             $this->em->persist($product);
             $slugs[] = $row['slug'];
+            $artwork[$row['slug']] = $row['artworkUrl'] ?? null;
             ++$counts['products'];
 
             // 2-4 distinct sellers per product.
@@ -159,7 +161,9 @@ final class SeedCommand extends Command
             ['Nintendo Switch favourites', 'Instant digital delivery', $slugs[\count($slugs) - 1]],
         ];
         foreach ($banners as $i => [$title, $subtitle, $slug]) {
-            $banner = new Banner($title, \sprintf('https://picsum.photos/seed/banner%d/1200/400', $i + 1), '/product/'.$slug, $subtitle);
+            // IGDB artwork when the seed row has it, otherwise a placeholder image.
+            $image = $artwork[$slug] ?? \sprintf('https://picsum.photos/seed/banner%d/1200/400', $i + 1);
+            $banner = new Banner($title, $image, '/product/'.$slug, $subtitle);
             $banner->setPosition($i);
             $this->em->persist($banner);
             ++$counts['banners'];
