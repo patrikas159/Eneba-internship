@@ -1,0 +1,26 @@
+/* Design tokens: Eneba-like dark purple theme. */
+:root {
+  --bg: #1b0b36;
+  --bg-elevated: #2a1052;
+  --bg-card: #321463;
+  --bg-input: #13072a;
+  --border: #4a2a80;
+  --text: #ffffff;
+  --text-muted: #b9a8d9;
+  --accent: #ffd200;
+  --accent-text: #1b0b36;
+  --pink: #ff3d8b;
+  --green: #3ddc84;
+  --danger: #ff5a5a;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+
+  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --container: 1240px;
+  --header-h: 68px;
+
+  color-scheme: dark;
+}
