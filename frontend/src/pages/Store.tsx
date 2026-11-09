@@ -44,6 +44,7 @@ function queryFromParams(params: URLSearchParams): ProductQuery {
 
 export default function Store() {
   const [params, setParams] = useSearchParams()
+  const [showFilters, setShowFilters] = useState(false)
   const query = queryFromParams(params)
 
   const filters = useQuery({ queryKey: ['filters'], queryFn: api.filters, staleTime: 5 * 60_000 })
@@ -77,7 +78,16 @@ export default function Store() {
 
   return (
     <div className="store">
-      <aside className="store__filters">
+      <button
+        type="button"
+        className="btn btn--ghost btn--block store__filters-toggle"
+        aria-expanded={showFilters}
+        aria-controls="store-filters"
+        onClick={() => setShowFilters((v) => !v)}
+      >
+        {showFilters ? 'Hide filters' : hasFilters ? 'Filters (active)' : 'Filters'}
+      </button>
+      <aside id="store-filters" className={`store__filters${showFilters ? ' is-open' : ''}`}>
         {filters.isPending && <Spinner />}
         {filters.isError && <ErrorMessage error={filters.error} onRetry={() => filters.refetch()} />}
         {filters.data && (
