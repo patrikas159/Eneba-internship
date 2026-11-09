@@ -1,3 +1,4 @@
+
 # Eneba-style digital key marketplace
 
 Internship assignment: a marketplace for digital game keys that looks and works like eneba.com.
@@ -194,3 +195,6 @@ sent to a local coding model ("Splash"). Every prompt sent to it is recorded wit
 
 - Full agent chat history (prompts and responses): `docs/ai-chat-logs/`
 - Prompts sent to the local worker: [`docs/ai-chat-logs/splash-prompts.md`](docs/ai-chat-logs/splash-prompts.md)
+=======
+# Eneba-internship
+
