@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_DB: eneba
       POSTGRES_USER: eneba
@@ -8,7 +8,7 @@ services:
     ports:
       - "127.0.0.1:5433:5432" # host 5433 (5432 is used by another local project)
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data_pg18:/var/lib/postgresql # PG18 image layout: mount the parent dir, not /data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U eneba -d eneba"]
       interval: 5s
@@ -33,4 +33,5 @@ services:
       start_period: 10s
 
 volumes:
-  db_data:
+  db_data: # old PG16 volume, kept as a backup
+  db_data_pg18:
