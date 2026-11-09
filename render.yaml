@@ -1,0 +1,21 @@
+# Render Blueprint: one free Docker web service. The database is Neon (free tier), so only its
+# connection string is entered by hand in the Render dashboard (sync: false = never committed).
+services:
+  - type: web
+    name: eneba-marketplace
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: APP_ENV
+        value: prod
+      - key: APP_SECRET
+        generateValue: true
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DEFAULT_URI
+        sync: false

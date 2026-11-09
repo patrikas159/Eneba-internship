@@ -1,0 +1,16 @@
+# Build context for the production Dockerfile (repo root).
+.git
+.claude
+.splash
+docs
+*.md
+2026-*.txt
+**/node_modules
+**/.DS_Store
+frontend/dist
+backend/vendor
+backend/var
+backend/.phpunit.cache
+backend/tests
+backend/.env.local
+backend/.env.*.local
