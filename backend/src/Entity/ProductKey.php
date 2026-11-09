@@ -20,6 +20,10 @@ class ProductKey
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private Offer $offer;
 
+    #[ORM\ManyToOne(targetEntity: OrderItem::class, inversedBy: 'keys')]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?OrderItem $orderItem = null;
+
     #[ORM\Column(length: 64, unique: true)]
     private string $code;
 
@@ -52,6 +56,18 @@ class ProductKey
     public function getCode(): string
     {
         return $this->code;
+    }
+
+    public function getOrderItem(): ?OrderItem
+    {
+        return $this->orderItem;
+    }
+
+    public function assignTo(OrderItem $item): static
+    {
+        $this->orderItem = $item;
+
+        return $this;
     }
 
     public function getStatus(): KeyStatus

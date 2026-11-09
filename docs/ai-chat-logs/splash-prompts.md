@@ -42,3 +42,39 @@ Report: list of files created, the migration filename, and the output of schema:
 
 Outcome: worker hit max turns but produced the 4 entities, KeyStatus enum, 4 repositories and migration Version20261109145207. Claude review found the composite indexes were declared inside #[ORM\Table(indexes:)] (ignored by ORM 3) and hand-added to the migration after it had already run; Claude moved them to class-level #[ORM\Index]/#[ORM\UniqueConstraint], recreated the tables from the migration, and schema:validate now passes.
 
+
+## 2026-11-09 17:06 - Order/user/payment/homepage entities
+
+```text
+Task: create the user, order, payment and homepage Doctrine entities and their migration in the Symfony 7.4 backend.
+
+Context
+- Project root: current directory. Backend is in `backend/` (Symfony 7.4, Doctrine ORM 3, PHP 8.5, PostgreSQL 16). There is NO PHP on the host: run every PHP/console command inside docker, e.g. `docker compose exec -T api php bin/console ...` (container working dir /app = backend/). Containers are running; do not stop/restart them or any other containers.
+- Follow the style of the existing entities: read `backend/src/Entity/Offer.php` and `backend/src/Entity/ProductKey.php` first (attribute mapping, `declare(strict_types=1);`, typed properties, constructor-initialised required fields, getters, integer cents for money, `\DateTimeImmutable`, explicit plural table names, `#[ORM\Entity(repositoryClass: ...)]`).
+- IMPORTANT: declare indexes/unique constraints as separate class-level attributes `#[ORM\Index(name: ..., columns: [...])]` / `#[ORM\UniqueConstraint(...)]`, NOT inside `#[ORM\Table(indexes: ...)]` (ORM 3 ignores those). Never hand-edit a migration after it has been executed.
+- Existing migrations in `backend/migrations` are already executed; do not edit them.
+
+Files to create (each entity gets a plain ServiceEntityRepository in `backend/src/Repository`)
+1. Enums in `backend/src/Entity`: `OrderStatus: string` (pending, paid, failed, cancelled) and `PaymentStatus: string` (pending, succeeded, failed).
+2. `User`, table `users`: id; email string(180) unique (store lowercased); passwordHash string(255); displayName string(80); createdAt. Setter for passwordHash and displayName.
+3. `Order`, table `orders`: id; reference string(20) unique (public order number); user ManyToOne User (not null, onDelete CASCADE); status enumType OrderStatus string(16) default Pending; totalCents int; currency string(3) default 'EUR'; createdAt; paidAt datetime_immutable nullable. OneToMany `items` -> OrderItem (mappedBy order, cascade persist, orphanRemoval) initialised in constructor, with `addItem(OrderItem)` and getter. Methods `markPaid(\DateTimeImmutable $at)`, `markFailed()`, `setTotalCents(int)`. Index `idx_order_user_created` on (user_id, created_at).
+4. `OrderItem`, table `order_items`: id; order ManyToOne Order (not null, onDelete CASCADE, inversedBy items); offer ManyToOne Offer (not null); productName string(200) (snapshot at purchase time); unitPriceCents int; quantity int. OneToMany `keys` -> ProductKey (mappedBy orderItem) initialised in constructor with getter.
+5. Modify `backend/src/Entity/ProductKey.php`: add nullable ManyToOne `orderItem` -> OrderItem (inversedBy keys, onDelete SET NULL) with getter and `assignTo(OrderItem $item)` setter. Do not change other existing methods.
+6. `Payment`, table `payments`: id; order ManyToOne Order (not null, onDelete CASCADE); provider string(32); idempotencyKey string(64) unique; status enumType PaymentStatus string(16) default Pending; amountCents int; providerReference string(64) nullable; failureReason string(255) nullable; createdAt. Methods `markSucceeded(string $providerReference)`, `markFailed(string $reason)`.
+7. `Banner`, table `banners`: id; title string(120); subtitle string(255) nullable; imageUrl string(500); linkUrl string(500); position int default 0; active bool default true.
+8. `HomeBlock`, table `home_blocks`: id; type string(32) (e.g. 'banners', 'best_sellers', 'deals', 'new_releases'); title string(120); position int default 0; active bool default true; settings json default [] (e.g. {"limit": 12}). Index `idx_home_block_active_position` on (active, position).
+9. Generate the migration: `docker compose exec -T api php bin/console doctrine:migrations:diff -n`. Open the generated file and check it only creates these tables plus the new `order_item_id` column/FK/index on `product_keys`; it must NOT drop anything. Then `docker compose exec -T api php bin/console doctrine:migrations:migrate -n`.
+
+Acceptance criteria (run all, all must pass)
+- `docker compose exec -T api php bin/console doctrine:schema:validate` reports mapping OK and database in sync.
+- `docker compose exec -T api php bin/console lint:container` passes.
+- `curl -s http://localhost:8080/api/health` returns {"status":"ok","database":"ok"}.
+
+Do NOT
+- edit anything outside `backend/src/Entity`, `backend/src/Repository`, `backend/migrations` (new file only);
+- install packages, touch `.env*` files, add security/auth code, run git commit/push.
+
+Report: files created/modified, migration filename, output of schema:validate.
+```
+
+Outcome: worker stopped early (context checkpoint) after creating all 6 entities, 2 enums, 6 repositories and the ProductKey.orderItem relation, but before generating the migration. Claude review found the payments unique constraint used the property name `idempotencyKey` instead of the column `idempotency_key` (mapping error); Claude fixed it, generated migration Version20261109151512 (creates only, no drops), migrated, and schema:validate / lint:container / health all pass.
