@@ -5,6 +5,11 @@ Internship assignment: a marketplace for digital game keys that looks and works 
 Visitors browse a store, search with typo tolerance, compare offers from several sellers,
 buy with a simulated payment and get a digital key straight away.
 
+- **Live demo:** https://eneba-marketplace-kteu.onrender.com/ (Render free tier: the first request after
+  ~15 minutes of inactivity takes up to a minute while the instance wakes up)
+- **Repository:** https://github.com/patrikas159/Eneba-internship
+- **Test card:** any number pays; `4000 0000 0000 0002` is declined
+
 | Part | Where |
 |---|---|
 | Store (filters, sort, name search) | `/store` · `GET /api/products`, `GET /api/products/filters` |
