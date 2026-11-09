@@ -54,6 +54,13 @@ class Seller
         return $this->rating;
     }
 
+    public function setRating(float $rating): static
+    {
+        $this->rating = $rating;
+
+        return $this;
+    }
+
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
