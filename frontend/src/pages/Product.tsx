@@ -1,13 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ApiError, api, formatPrice, type Offer, type ProductDetail } from '../api/client'
+import { SimilarGames } from '../components/SimilarGames'
 import { ErrorMessage, Spinner } from '../components/Status'
 import { MAX_QUANTITY, useCart } from '../hooks/useCart'
 
 export default function Product() {
   const { slug = '' } = useParams()
   const product = useQuery({ queryKey: ['product', slug], queryFn: () => api.product(slug) })
+
+  // Opening another product (e.g. from Similar games at the bottom) should start at the top.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [slug])
 
   if (product.isPending) return <Spinner />
   if (product.isError) {
@@ -27,33 +33,36 @@ export default function Product() {
 
   const p = product.data
   return (
-    <article className="product">
-      <div className="product__cover">
-        {p.coverUrl ? <img src={p.coverUrl} alt={p.name} /> : <div className="card__placeholder">{p.name}</div>}
-      </div>
-
-      <div className="product__info">
-        <h1>{p.name}</h1>
-        <div className="product__tags">
-          <span className="tag">{p.platform}</span>
-          <span className="tag">{p.region}</span>
-          {p.genres.map((g) => (
-            <Link key={g} to={`/store?genre=${encodeURIComponent(g)}`} className="tag tag--link">
-              {g}
-            </Link>
-          ))}
+    <>
+      <article className="product">
+        <div className="product__cover">
+          {p.coverUrl ? <img src={p.coverUrl} alt={p.name} /> : <div className="card__placeholder">{p.name}</div>}
         </div>
-        {p.releaseDate && (
-          <p className="muted">
-            Released{' '}
-            {new Date(p.releaseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
-        )}
-        {p.description && <p className="product__description">{p.description}</p>}
 
-        <Offers product={p} />
-      </div>
-    </article>
+        <div className="product__info">
+          <h1>{p.name}</h1>
+          <div className="product__tags">
+            <span className="tag">{p.platform}</span>
+            <span className="tag">{p.region}</span>
+            {p.genres.map((g) => (
+              <Link key={g} to={`/store?genre=${encodeURIComponent(g)}`} className="tag tag--link">
+                {g}
+              </Link>
+            ))}
+          </div>
+          {p.releaseDate && (
+            <p className="muted">
+              Released{' '}
+              {new Date(p.releaseDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          )}
+          {p.description && <p className="product__description">{p.description}</p>}
+
+          <Offers product={p} />
+        </div>
+      </article>
+      <SimilarGames product={p} />
+    </>
   )
 }
 
