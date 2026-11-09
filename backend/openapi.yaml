@@ -90,6 +90,24 @@ paths:
                 required: [items]
                 properties:
                   items: { type: array, items: { $ref: '#/components/schemas/ProductCard' } }
+  /home:
+    get:
+      summary: Homepage layout. Active blocks in display order, each filled server-side by the provider for its type
+      description: |
+        Block types: banners (itemKind=banner), best_sellers, deals, new_releases, genre (itemKind=product).
+        Blocks whose type has no provider or that resolve to zero items are omitted. Cached publicly for 60 s.
+      responses:
+        '200':
+          description: Layout
+          headers:
+            Cache-Control: { schema: { type: string, example: 'max-age=60, public' } }
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [blocks]
+                properties:
+                  blocks: { type: array, items: { $ref: '#/components/schemas/HomeBlock' } }
   /auth/register:
     post:
       summary: Create an account and sign in (sets the httpOnly auth cookie)
@@ -360,6 +378,33 @@ components:
       properties:
         error: { type: string, example: invalid_query }
         message: { type: string }
+    HomeBlock:
+      type: object
+      required: [id, type, title, itemKind, settings, items]
+      properties:
+        id: { type: integer }
+        type: { type: string, enum: [banners, best_sellers, deals, new_releases, genre] }
+        title: { type: string, example: Best sellers }
+        itemKind: { type: string, enum: [product, banner], description: 'Tells the client how to render items' }
+        settings:
+          type: object
+          additionalProperties: true
+          description: 'Provider settings, e.g. {"limit": 12} or {"genre": "RPG", "limit": 12}'
+        items:
+          type: array
+          items:
+            oneOf:
+              - { $ref: '#/components/schemas/ProductCard' }
+              - { $ref: '#/components/schemas/Banner' }
+    Banner:
+      type: object
+      required: [id, title, subtitle, imageUrl, linkUrl]
+      properties:
+        id: { type: integer }
+        title: { type: string, example: Spring Sale }
+        subtitle: { type: [string, 'null'] }
+        imageUrl: { type: string, format: uri }
+        linkUrl: { type: string, example: /product/elden-ring-pc-global }
     ProductCard:
       type: object
       required: [id, slug, name, coverUrl, platform, region, genres, releaseDate, priceCents, originalPriceCents, discountPercent, currency, offerCount, inStock]

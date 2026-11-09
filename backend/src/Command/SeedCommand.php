@@ -170,6 +170,7 @@ final class SeedCommand extends Command
             ['best_sellers', 'Best sellers', ['limit' => 12]],
             ['deals', 'Hot deals', ['limit' => 12]],
             ['new_releases', 'New releases', ['limit' => 12]],
+            ['genre', 'RPG picks', ['genre' => 'RPG', 'limit' => 12]],
         ];
         foreach ($blocks as $i => [$type, $title, $settings]) {
             $block = (new HomeBlock($type, $title))->setPosition($i)->setSettings($settings);

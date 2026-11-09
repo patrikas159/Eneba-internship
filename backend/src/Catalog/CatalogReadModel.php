@@ -120,6 +120,32 @@ final class CatalogReadModel
     }
 
     /**
+     * In-stock products ranked by keys sold (paid orders), then by seller count.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function bestSellers(int $limit): array
+    {
+        $sql = 'WITH '.self::PRICE_CTE.',
+            sold AS (
+                SELECT o.product_id, count(*) AS sold
+                FROM product_keys k
+                JOIN offers o ON o.id = k.offer_id
+                WHERE k.status = \'sold\'
+                GROUP BY o.product_id
+            )
+            SELECT '.self::cardColumns().'
+            FROM products p
+            JOIN best b ON b.product_id = p.id
+            LEFT JOIN agg a ON a.product_id = p.id
+            LEFT JOIN sold s ON s.product_id = p.id
+            ORDER BY coalesce(s.sold, 0) DESC, a.offer_count DESC, p.name ASC
+            LIMIT :limit';
+
+        return array_map(self::card(...), $this->connection->fetchAllAssociative($sql, ['limit' => $limit]));
+    }
+
+    /**
      * Typo-tolerant autocomplete for the global search box.
      *
      * @return list<array<string, mixed>>
