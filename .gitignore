@@ -1,0 +1,7 @@
+.DS_Store
+.idea/
+.vscode/
+frontend/dist/
+.claude/.handoff-state
+**/.claude/.handoff-state
+2026-11-09-*-pastedcontent-*.txt
