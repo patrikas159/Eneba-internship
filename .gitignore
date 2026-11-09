@@ -6,3 +6,10 @@ frontend/dist/
 **/.claude/.handoff-state
 2026-11-09-*-pastedcontent-*.txt
 .splash/
+
+# Local secrets written by tools (e.g. neon init)
+/.env
+/.env.local
+/.env.*.local
+.neon
+node_modules/
