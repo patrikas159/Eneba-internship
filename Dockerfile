@@ -15,6 +15,7 @@ RUN npm run build
 FROM dunglas/frankenphp:1-php8.5 AS app
 
 RUN install-php-extensions pdo_pgsql intl opcache zip \
+    && setcap -r /usr/local/bin/frankenphp \
     && cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 COPY deploy/php-prod.ini "$PHP_INI_DIR/conf.d/zz-app.ini"
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
