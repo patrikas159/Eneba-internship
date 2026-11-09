@@ -10,6 +10,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
 #[ORM\Table(name: 'products')]
+// GIN gin_trgm_ops index, created by hand in Version20261109160000. Declared here (as a plain index)
+// only so that doctrine:migrations:diff does not try to drop it; DBAL does not compare index methods.
+#[ORM\Index(name: 'idx_products_name_trgm', columns: ['name'])]
 class Product
 {
     #[ORM\Id]
