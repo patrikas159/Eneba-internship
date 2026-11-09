@@ -78,3 +78,40 @@ Report: files created/modified, migration filename, output of schema:validate.
 ```
 
 Outcome: worker stopped early (context checkpoint) after creating all 6 entities, 2 enums, 6 repositories and the ProductKey.orderItem relation, but before generating the migration. Claude review found the payments unique constraint used the property name `idempotencyKey` instead of the column `idempotency_key` (mapping error); Claude fixed it, generated migration Version20261109151512 (creates only, no drops), migrated, and schema:validate / lint:container / health all pass.
+
+## 2026-11-09 17:15 - Fixture seed command (app:seed)
+
+```text
+Task: add a local fixture seed command `app:seed` to the Symfony 7.4 backend that fills the catalog with demo data.
+
+Context
+- Project root: current directory. Backend is in `backend/` (Symfony 7.4, Doctrine ORM 3, PHP 8.5, PostgreSQL 16). There is NO PHP on the host: run every PHP/console command inside docker, e.g. `docker compose exec -T api php bin/console ...` (container working dir /app = backend/). Containers are running; do not stop/restart them.
+- Read these entities first (constructors and setters): `backend/src/Entity/Product.php`, `Seller.php`, `Offer.php`, `ProductKey.php`, `Banner.php`, `HomeBlock.php`.
+- Later an IGDB importer will write the same JSON format, so the command must only read the JSON file, never call the network.
+
+Files to create
+1. `backend/data/seed/products.json`: a JSON array of 30 real, well-known video games, each object:
+   {"slug": "elden-ring-pc-global", "name": "Elden Ring", "description": "<2-3 sentences>", "platform": "PC", "region": "Global", "genres": ["RPG", "Action"], "releaseDate": "2022-02-25", "coverUrl": null}
+   Use platforms from: "PC", "PlayStation 5", "Xbox Series X|S", "Nintendo Switch"; regions from: "Global", "Europe", "North America". Mix them. Slugs unique, lowercase, hyphenated.
+2. `backend/src/Command/SeedCommand.php`, name `app:seed`, using `#[AsCommand]`, constructor-injected `EntityManagerInterface` and `%kernel.project_dir%` (via `#[Autowire('%kernel.project_dir%')]`). Behaviour:
+   - Option `--purge`: before seeding, delete all rows from product_keys, offers, products, sellers, banners, home_blocks (use DQL DELETE in that order). Without `--purge`, if any product exists, print a message and exit SUCCESS without changes (idempotent).
+   - Create 5 sellers (e.g. "KeyHaven", "PixelVault", "GameDrop", "NordKeys", "LootLane") with ratings between 4.1 and 4.9.
+   - For each product from the JSON: 2-4 offers from different sellers (deterministic: use `mt_srand(42)` at start and `mt_rand`), priceCents between 299 and 6999, about half with originalPriceCents 10-60% higher. Each offer gets 3-8 ProductKey rows with codes like `XXXXX-XXXXX-XXXXX` (uppercase A-Z0-9, unique; use random_bytes-based generation).
+   - 3 banners (title, subtitle, imageUrl like `https://picsum.photos/seed/banner1/1200/400`, linkUrl like `/product/<slug of a seeded product>`, positions 0..2).
+   - home_blocks: ('banners','Featured',0,{}), ('best_sellers','Best sellers',1,{"limit":12}), ('deals','Hot deals',2,{"limit":12}), ('new_releases','New releases',3,{"limit":12}).
+   - Flush in batches (e.g. after every product), print counts at the end.
+
+Acceptance criteria (run all, all must pass)
+- `docker compose exec -T api php bin/console app:seed --purge` succeeds and prints counts (30 products, 5 sellers, offers, keys, 3 banners, 4 home blocks).
+- Running `docker compose exec -T api php bin/console app:seed` again exits successfully without inserting duplicates.
+- `docker compose exec -T db psql -U eneba -d eneba -c "select count(*) from products"` returns 30.
+- `docker compose exec -T api php bin/console lint:container` passes.
+
+Do NOT
+- edit anything outside `backend/src/Command/`, `backend/data/seed/`;
+- edit entities or migrations, install packages, touch `.env*` files, run git commit/push.
+
+Report: files created and the seed command output.
+```
+
+Outcome: stopped by the user from the Splash menu bar before any files were written (exit 5). Not retried; waiting for the user's decision.
