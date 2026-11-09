@@ -1,0 +1,172 @@
+openapi: 3.1.0
+info:
+  title: Eneba-style marketplace API
+  version: 0.1.0
+  description: |
+    REST API for the digital-key marketplace. Money is always integer cents (EUR).
+    A product's price is its cheapest active offer that still has an available key; stock = available keys.
+servers:
+  - url: /api
+paths:
+  /health:
+    get:
+      summary: Liveness and database check
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  database: { type: string, example: ok }
+        '503': { description: Database unreachable }
+  /products:
+    get:
+      summary: Store listing with filters, sort and typo-tolerant name search
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 100 }, description: 'Name search (substring or pg_trgm word similarity >= 0.3)' }
+        - { name: platform, in: query, schema: { type: string }, description: 'Comma-separated, e.g. "PC,Nintendo Switch"' }
+        - { name: region, in: query, schema: { type: string }, description: Comma-separated }
+        - { name: genre, in: query, schema: { type: string } }
+        - { name: minPrice, in: query, schema: { type: integer, minimum: 0 }, description: Cents }
+        - { name: maxPrice, in: query, schema: { type: integer, minimum: 0 }, description: Cents }
+        - { name: inStock, in: query, schema: { type: boolean } }
+        - name: sort
+          in: query
+          description: Defaults to relevance when q is set, otherwise newest
+          schema: { type: string, enum: [relevance, price_asc, price_desc, newest, name, discount] }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 60, default: 24 } }
+      responses:
+        '200':
+          description: One page of products
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductPage' }
+        '400':
+          description: Invalid query parameter
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /products/filters:
+    get:
+      summary: Filter facets (with product counts) and price range for the Store sidebar
+      responses:
+        '200':
+          description: Facets
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Filters' }
+  /products/{slug}:
+    get:
+      summary: Product page with all active offers (cheapest in-stock first)
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9-]+$' } }
+      responses:
+        '200':
+          description: Product detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductDetail' }
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /search/suggest:
+    get:
+      summary: Typo-tolerant autocomplete for the global search box (max 8 results)
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string }, description: 'Fewer than 2 characters returns no items' }
+      responses:
+        '200':
+          description: Suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/ProductCard' } }
+components:
+  schemas:
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error: { type: string, example: invalid_query }
+        message: { type: string }
+    ProductCard:
+      type: object
+      required: [id, slug, name, coverUrl, platform, region, genres, releaseDate, priceCents, originalPriceCents, discountPercent, currency, offerCount, inStock]
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { type: string }
+        coverUrl: { type: [string, 'null'] }
+        platform: { type: string, example: PC }
+        region: { type: string, example: Global }
+        genres: { type: array, items: { type: string } }
+        releaseDate: { type: [string, 'null'], format: date }
+        priceCents: { type: [integer, 'null'], description: 'Cheapest in-stock offer; null when out of stock' }
+        originalPriceCents: { type: [integer, 'null'] }
+        discountPercent: { type: [integer, 'null'] }
+        currency: { type: string, example: EUR }
+        offerCount: { type: integer, description: Number of in-stock offers }
+        inStock: { type: boolean }
+    ProductPage:
+      type: object
+      required: [items, total, page, limit]
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/ProductCard' } }
+        total: { type: integer }
+        page: { type: integer }
+        limit: { type: integer }
+    Offer:
+      type: object
+      required: [id, priceCents, originalPriceCents, discountPercent, currency, stock, inStock, seller]
+      properties:
+        id: { type: integer }
+        priceCents: { type: integer }
+        originalPriceCents: { type: [integer, 'null'] }
+        discountPercent: { type: [integer, 'null'] }
+        currency: { type: string }
+        stock: { type: integer }
+        inStock: { type: boolean }
+        seller:
+          type: object
+          required: [id, name, slug, rating]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            slug: { type: string }
+            rating: { type: number, example: 4.8 }
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/ProductCard'
+        - type: object
+          required: [description, offers]
+          properties:
+            description: { type: string }
+            offers: { type: array, items: { $ref: '#/components/schemas/Offer' } }
+    Facet:
+      type: object
+      required: [value, count]
+      properties:
+        value: { type: string }
+        count: { type: integer }
+    Filters:
+      type: object
+      required: [platforms, regions, genres, price, sorts]
+      properties:
+        platforms: { type: array, items: { $ref: '#/components/schemas/Facet' } }
+        regions: { type: array, items: { $ref: '#/components/schemas/Facet' } }
+        genres: { type: array, items: { $ref: '#/components/schemas/Facet' } }
+        price:
+          type: object
+          properties:
+            minCents: { type: integer }
+            maxCents: { type: integer }
+        sorts: { type: array, items: { type: string } }
