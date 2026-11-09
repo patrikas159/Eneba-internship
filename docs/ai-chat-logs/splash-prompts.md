@@ -115,3 +115,9 @@ Report: files created and the seed command output.
 ```
 
 Outcome: stopped by the user from the Splash menu bar before any files were written (exit 5). Not retried; waiting for the user's decision.
+
+## 2026-11-09 21:00 - Store Sort/Genre dropdowns (Radix Select)
+
+Planned handoff: replace the native Sort and Genre `<select>` elements in `frontend/src/pages/Store.tsx` with a reusable Radix Select component (`frontend/src/components/Select.tsx`) in the purple/yellow theme, keeping the existing URL query behaviour; verify with `npx tsc -b`, `npm run lint`, `npm run build`.
+
+Outcome: not sent. The Splash worker was turned off by the user for this session, so Claude implemented it directly together with the fixed two-level header, the new footer and the `/about` page, and verified it in headless Chromium (keyboard open/select, no layout jump while the dropdown is open).

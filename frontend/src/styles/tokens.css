@@ -21,6 +21,8 @@
   --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --container: 1240px;
   --header-h: 68px;
+  --subnav-h: 44px;
+  --header-offset: calc(var(--header-h) + var(--subnav-h) + 1px); /* overwritten at runtime by Header.tsx */
 
   color-scheme: dark;
 }

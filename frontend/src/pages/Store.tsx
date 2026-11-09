@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, type Filters, type ProductQuery, type ProductSort } from '../api/client'
 import { ProductCard } from '../components/ProductCard'
+import { Select } from '../components/Select'
 import { ErrorMessage, Spinner } from '../components/Status'
 
 const PAGE_SIZE = 24
@@ -120,22 +121,19 @@ export default function Store() {
               </span>
             )}
           </div>
-          <label className="store__sort">
-            <span className="muted">Sort by</span>
-            <select
-              className="input"
+          <div className="store__sort">
+            <span className="muted" id="store-sort-label">
+              Sort by
+            </span>
+            <Select
+              aria-labelledby="store-sort-label"
               value={query.sort ?? (query.q ? 'relevance' : 'newest')}
-              onChange={(e) => update({ sort: e.target.value })}
-            >
-              {(Object.keys(SORT_LABELS) as ProductSort[])
+              onValueChange={(value) => update({ sort: value })}
+              options={(Object.keys(SORT_LABELS) as ProductSort[])
                 .filter((s) => s !== 'relevance' || query.q)
-                .map((s) => (
-                  <option key={s} value={s}>
-                    {SORT_LABELS[s]}
-                  </option>
-                ))}
-            </select>
-          </label>
+                .map((s) => ({ value: s, label: SORT_LABELS[s] }))}
+            />
+          </div>
         </div>
 
         {products.isPending && <Spinner />}
@@ -242,14 +240,15 @@ function FilterPanel(props: FilterPanelProps) {
 
       <fieldset className="filter">
         <legend>Genre</legend>
-        <select className="input" value={props.genre} onChange={(e) => onUpdate({ genre: e.target.value })}>
-          <option value="">All genres</option>
-          {filters.genres.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.value} ({f.count})
-            </option>
-          ))}
-        </select>
+        <Select
+          aria-label="Genre"
+          value={props.genre}
+          onValueChange={(value) => onUpdate({ genre: value })}
+          options={[
+            { value: '', label: 'All genres' },
+            ...filters.genres.map((f) => ({ value: f.value, label: `${f.value} (${f.count})` })),
+          ]}
+        />
       </fieldset>
 
       {/* Remount when the URL changes so the inputs show the applied values. */}
