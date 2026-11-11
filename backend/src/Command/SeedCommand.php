@@ -156,14 +156,15 @@ final class SeedCommand extends Command
         }
 
         $banners = [
-            ['Spring Sale', 'Up to 60% off top PC titles', $slugs[0]],
-            ['New on PlayStation 5', 'Fresh keys from trusted sellers', $slugs[min(14, \count($slugs) - 1)]],
-            ['Nintendo Switch favourites', 'Instant digital delivery', $slugs[\count($slugs) - 1]],
+            // [title, subtitle, product whose artwork is the image, Store listing the banner advertises]
+            ['Spring Sale', 'Up to 60% off top PC titles', $slugs[0], '/store?platform=PC&onSale=true&sort=discount'],
+            ['New on PlayStation 5', 'Fresh keys from trusted sellers', $slugs[min(14, \count($slugs) - 1)], '/store?platform=PlayStation%205&sort=newest'],
+            ['Nintendo Switch favourites', 'Instant digital delivery', $slugs[\count($slugs) - 1], '/store?platform=Nintendo%20Switch'],
         ];
-        foreach ($banners as $i => [$title, $subtitle, $slug]) {
+        foreach ($banners as $i => [$title, $subtitle, $slug, $link]) {
             // IGDB artwork when the seed row has it, otherwise a placeholder image.
             $image = $artwork[$slug] ?? \sprintf('https://picsum.photos/seed/banner%d/1200/400', $i + 1);
-            $banner = new Banner($title, $image, '/product/'.$slug, $subtitle);
+            $banner = new Banner($title, $image, $link, $subtitle);
             $banner->setPosition($i);
             $this->em->persist($banner);
             ++$counts['banners'];

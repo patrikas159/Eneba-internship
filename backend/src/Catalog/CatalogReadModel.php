@@ -86,6 +86,9 @@ final class CatalogReadModel
         if ($query->inStockOnly) {
             $where[] = 'b.product_id IS NOT NULL';
         }
+        if ($query->onSaleOnly) {
+            $where[] = 'b.original_price_cents > b.price_cents';
+        }
 
         $orderBy = match ($query->sort) {
             'relevance' => 'word_similarity(:q, p.name) DESC, similarity(:q, p.name) DESC, p.name ASC',

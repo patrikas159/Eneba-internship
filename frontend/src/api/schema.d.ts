@@ -75,6 +75,8 @@ export interface paths {
                     /** @description Cents */
                     maxPrice?: number;
                     inStock?: boolean;
+                    /** @description Only products whose best offer is discounted */
+                    onSale?: boolean;
                     /** @description Defaults to relevance when q is set, otherwise newest */
                     sort?: "relevance" | "price_asc" | "price_desc" | "newest" | "name" | "discount";
                     page?: number;

@@ -24,6 +24,8 @@ final readonly class ProductListQuery
         public ?int $minPriceCents = null,
         public ?int $maxPriceCents = null,
         public bool $inStockOnly = false,
+        /** Only products whose cheapest in-stock offer is discounted. */
+        public bool $onSaleOnly = false,
         public string $sort = 'relevance',
         public int $page = 1,
         public int $limit = 24,
@@ -63,6 +65,7 @@ final readonly class ProductListQuery
             minPriceCents: $min,
             maxPriceCents: $max,
             inStockOnly: $request->query->getBoolean('inStock'),
+            onSaleOnly: $request->query->getBoolean('onSale'),
             // "relevance" without a search term means nothing; fall back to newest.
             sort: 'relevance' === $sort && '' === $q ? 'newest' : $sort,
             page: $page,

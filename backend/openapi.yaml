@@ -33,6 +33,7 @@ paths:
         - { name: minPrice, in: query, schema: { type: integer, minimum: 0 }, description: Cents }
         - { name: maxPrice, in: query, schema: { type: integer, minimum: 0 }, description: Cents }
         - { name: inStock, in: query, schema: { type: boolean } }
+        - { name: onSale, in: query, schema: { type: boolean }, description: Only products whose best offer is discounted }
         - name: sort
           in: query
           description: Defaults to relevance when q is set, otherwise newest

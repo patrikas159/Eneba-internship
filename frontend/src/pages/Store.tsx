@@ -37,6 +37,7 @@ function queryFromParams(params: URLSearchParams): ProductQuery {
     minPrice: toInt(params.get('minPrice')),
     maxPrice: toInt(params.get('maxPrice')),
     inStock: params.get('inStock') === 'true' ? true : undefined,
+    onSale: params.get('onSale') === 'true' ? true : undefined,
     sort: sort && sort in SORT_LABELS ? (sort as ProductSort) : undefined,
     page: toInt(params.get('page')) || 1,
     limit: PAGE_SIZE,
@@ -72,7 +73,7 @@ export default function Store() {
     update({ [key]: nextList.join(',') })
   }
 
-  const hasFilters = ['platform', 'region', 'genre', 'minPrice', 'maxPrice', 'inStock', 'q'].some((k) => params.has(k))
+  const hasFilters = ['platform', 'region', 'genre', 'minPrice', 'maxPrice', 'inStock', 'onSale', 'q'].some((k) => params.has(k))
   const total = products.data?.total ?? 0
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const page = query.page ?? 1
@@ -98,6 +99,7 @@ export default function Store() {
             regions={splitList(params.get('region'))}
             genre={params.get('genre') ?? ''}
             inStock={query.inStock === true}
+            onSale={query.onSale === true}
             minPrice={query.minPrice}
             maxPrice={query.maxPrice}
             onToggle={toggleListValue}
@@ -186,6 +188,7 @@ interface FilterPanelProps {
   regions: string[]
   genre: string
   inStock: boolean
+  onSale: boolean
   minPrice?: number
   maxPrice?: number
   onToggle: (key: 'platform' | 'region', value: string) => void
@@ -205,6 +208,14 @@ function FilterPanel(props: FilterPanelProps) {
             onChange={(e) => onUpdate({ inStock: e.target.checked ? 'true' : undefined })}
           />
           <span>In stock only</span>
+        </label>
+        <label className="filter__option">
+          <input
+            type="checkbox"
+            checked={props.onSale}
+            onChange={(e) => onUpdate({ onSale: e.target.checked ? 'true' : undefined })}
+          />
+          <span>On sale only</span>
         </label>
       </fieldset>
 

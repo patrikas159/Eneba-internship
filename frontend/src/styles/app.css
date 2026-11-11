@@ -43,7 +43,7 @@ button, input, select { font: inherit; color: inherit; }
 .header { position: fixed; top: 0; left: 0; right: 0; z-index: 20; }
 .header__top { background: var(--bg); }
 .header__inner { display: flex; align-items: center; gap: 20px; height: var(--header-h); }
-.subnav { background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+.subnav { background: var(--bg-elevated); }
 .subnav__links {
   display: flex; gap: 4px; margin: 0 auto; list-style: none; height: var(--subnav-h);
   overflow-x: auto; scrollbar-width: none;
